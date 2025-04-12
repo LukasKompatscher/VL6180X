@@ -127,4 +127,4 @@ func main() {
 
 ## Contributing
 
-Contributions and improvements are welcome. If you encounter issues or have ideas on how to enhance the package (for example, by adding additional error handling or support for more sensor features), please open an issue or submit a pull request on [GitHub](https://github.com/LukasKompatscher/VL6180X).
+Contributions and improvements are welcome. If you encounter issues or have ideas on how to enhance the package (for example, by adding additional error handling or support for more sensor features), please open an issue or submit a pull request on this github repo.
