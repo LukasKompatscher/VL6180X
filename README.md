@@ -59,6 +59,7 @@ func main() {
     // - Global ALS gain set to ALSGain1 (factory default for normal lighting)
     // You may also specify per-sensor overrides if needed.
     opts := vl6180x.Options{
+        MuxAddress:  0x70, // I²C address of the PCA9548 multiplexer
         Scaling:   vl6180x.Scaling1,
         ALSGain:   vl6180x.ALSGain1,
         // Optional per-sensor overrides:
@@ -67,7 +68,7 @@ func main() {
     }
 
     // Initialize the multiplexer with 2 sensors on bus 1.
-    device, err := vl6180x.NewVL6180Mux(1, 2, opts)
+    device, err := vl6180x.NewVL6180Mux(5, 2, opts)
     if err != nil {
         log.Fatalf("Failed to initialize VL6180X sensors: %v", err)
     }
