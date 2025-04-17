@@ -358,31 +358,44 @@ func (d *VL6180Mux) setScalingInternal(index int, newScaling int) error {
 	return nil
 }
 
-// ReadDistance triggers a single distance measurement on the specified sensor and returns the distance in millimeters.
+// ReadDistance triggers a single distance measurement and returns the distance in millimeters,
+// or an error if the sensor doesn’t respond within 200 ms.
 func (d *VL6180Mux) ReadDistance(sensorIndex int) (int, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Select the appropriate sensor via the I2C multiplexer
 	if err := d.selectChannel(sensorIndex); err != nil {
 		return 0, err
+	}
+	// Clear any pending interrupt
+	if err := d.writeReg8(regSystemInterruptClear, 0x07); err != nil {
+		return 0, fmt.Errorf("clear before start failed: %v", err)
 	}
 	// Start a range measurement by writing 0x01 to SYSRANGE_START register
 	if err := d.writeReg8(regSysRangeStart, 0x01); err != nil {
 		return 0, fmt.Errorf("failed to start range measurement: %v", err)
 	}
+
+	// Poll up to 200 ms for “new sample ready”
 	// Poll the interrupt status until the new sample is ready (bit[2:0] == 0x4 indicates range data ready)
-	for {
-		status, err := d.readReg8(regResultInterruptStatus)
+	deadline := time.Now().Add(200 * time.Millisecond)
+	var status byte
+	for time.Now().Before(deadline) {
+		st, err := d.readReg8(regResultInterruptStatus)
 		if err != nil {
 			return 0, fmt.Errorf("failed to read range status: %v", err)
+
 		}
-		if status&0x07 == 0x04 {
-			break // New range data available
+		if st&0x07 == 0x04 {
+			status = st
+			break
 		}
-		// Small delay to avoid busy-waiting too tightly (sensor typically ready within a few ms)
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 	}
+	if status&0x07 != 0x04 {
+		return 0, fmt.Errorf("range poll timeout")
+	}
+
 	// Read the result from the sensor's RESULT_RANGE_VAL register
 	dist, err := d.readReg8(regResultRangeVal)
 	if err != nil {
@@ -390,8 +403,7 @@ func (d *VL6180Mux) ReadDistance(sensorIndex int) (int, error) {
 	}
 	// Clear the sensor's interrupt flags to prepare for the next measurement
 	if err := d.writeReg8(regSystemInterruptClear, 0x07); err != nil {
-		// If clearing interrupts fails, we still have the measurement; log and return error
-		return int(dist), fmt.Errorf("distance read OK (=%d mm), but failed to clear interrupt: %v", dist, err)
+		return int(dist), fmt.Errorf("clear after read failed: %v", err)
 	}
 	return int(dist), nil
 }
